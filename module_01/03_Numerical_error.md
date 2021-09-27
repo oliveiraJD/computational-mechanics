@@ -4,10 +4,10 @@ jupytext:
   text_representation:
     extension: .md
     format_name: myst
-    format_version: 0.12
-    jupytext_version: 1.6.0
+    format_version: 0.13
+    jupytext_version: 1.11.4
 kernelspec:
-  display_name: Python 3
+  display_name: Python 3 (ipykernel)
   language: python
   name: python3
 ---
@@ -175,7 +175,8 @@ t=[0,2,4,6,8,10,12]
 import numpy as np
 #t=np.array([0,2,4,6,8,10,12])
 # or 
-t=np.linspace(0,12,7)
+t=np.linspace(0,12,3)
+t
 ```
 
 Now, you create a `for`-loop to solve for `v_numerical` at times 2, 4, 6, 8, 10, and 12 sec. We don't need to solve for `v_numerical` at time 0 seconds because this is the initial velocity of the object. In this example, the initial velocity is v(0)=0 m/s.
@@ -630,15 +631,15 @@ c. Use a growth rate of $k_g=0.013$ [1/years] and compare the analytical solutio
 
 d. Discussion question: If you decrease the time steps further and the solution converges, will it converge to the actual world population? Why or why not? 
 
-**Note: We have used a new function `np.loadtxt` here. Use the `help` or `?` to learn about what this function does and how the arguments can change the output. In the next module, we will go into more details on how to load data, plot data, and present trends.**
+#**Note: We have used a new function `np.loadtxt` here. Use the `help` or `?` to learn about what this function does and how the arguments can change the output. In the next module, we will go into more details on how to load data, plot data, and present trends.**
 
 ```{code-cell} ipython3
 import numpy as np
+import math
 year, pop = np.loadtxt('../data/world_population_1900-2020.csv',skiprows=1,delimiter=',',unpack=True)
 print('years=',year)
 print('population =', pop)
 ```
-
 
 ```{code-cell} ipython3
 print('average population changes 1900-1950, 1950-2000, 2000-2020')
@@ -647,10 +648,60 @@ print('average growth of 1900 - 2020')
 print(np.mean((pop[1:] - pop[0:-1])/(year[1:] - year[0:-1])))
 ```
 
+```{code-cell} ipython3
+def p_analytical(t,k,p_0):
+    '''Analytical solution for the size of a population after time in years,t  
+    and given a growth rate
+    
+        Arguments 
+    ---------
+    t: time in years
+    k: growth rate [1/years]
+    
+    Returns
+    -------
+    p: the population size at time t'''
+    
+    p = p_0*np.exp(k*(t-1900))
+    return p
+
+for t in range(1900,2040,20):
+    print('Year: {:5.0f}, Population: {:5.0f}'.format(t,p_analytical(t,k,pop[0])))
+```
+
+```{code-cell} ipython3
+#Numerical solution
+k = 0.013
+
+t = np.linspace(1900, 2020,7) #Creates an array 1900 to 2020, 20 year intervals
+dt = t[1] - t[0]
+
+pop = np.zeros(len(t))
+pop[0] = 1578000000 #Initial condition p(t=1900)=1.578e9
+
+for i in range(len(t)-1):
+    pop[i+1] = k*pop[i]*dt + pop[i]
+```
+
+```{code-cell} ipython3
+plt.plot(t,p_analytical(t,k,pop[0]),'-',label='analytical')
+plt.plot(t,pop,'o-', label='numerical')
+plt.legend()
+plt.xlabel('Year')
+plt.ylabel('Population')
+```
+
 __d.__ As the number of time steps increases, the Euler approximation approaches the analytical solution, not the measured data. The best-case scenario is that the Euler solution is the same as the analytical solution.
 
-
-+++
+```{code-cell} ipython3
+#1d
+'''The numerical solution will converge with the analytical solution 
+as we decrease the size of the time step. At 50 timesteps, we are
+calculating the population every 2.4 years, and the solutions converge.
+We cannot say it is converging to the actual world population because
+we do not know if the analytical solution represents the actual world 
+population'''
+```
 
 2. In the freefall example you used smaller time steps to decrease the **truncation error** in our Euler approximation. Another way to decrease approximation error is to continue expanding the Taylor series. Consider the function f(x)
 
@@ -679,6 +730,56 @@ def exptaylor(x,n):
             ex+=x**(i+1)/factorial(i+1) # add the nth-order result for each step in loop
         return ex
         
+```
+
+```{code-cell} ipython3
+#1a
+e_numerical = exptaylor(1,2)
+e_analytical = np.exp(1)
+rel_error = (e_numerical - e_analytical)/e_analytical
+print("exp(1) approximated using Taylor {:5.4f}".format(e_numerical))
+print("exp(1) built in function {:5.4f}".format(e_analytical))
+print("The relative error is {:5.4f}".format(rel_error))
+```
+
+```{code-cell} ipython3
+%%time
+e_numerical = exptaylor(1,2)
+print("Time to run second order Taylor")
+```
+
+```{code-cell} ipython3
+%%time
+e_numerical = exptaylor(1,1000)
+print("Time to run tenth order Taylor")
+```
+
+```{code-cell} ipython3
+#1b
+'''Running a 1000 oder Taylor series takes 14.5ms and running a 10,000
+order Taylor series takes 11.9 s. This is an increase in magnitude of 820x
+so by that logic, running a 100,000 order Taylor series will take 
+9758 seconds or 2 hours and 42 minutes'''
+```
+
+```{code-cell} ipython3
+#1c
+n = np.arange(0, 1000, 5) # create an array from 10^1 to 10^3 with N values
+N = len(n)
+error = np.zeros(N, dtype = np.float32)    # initialize an N-valued array of relative errors
+
+e_num=np.zeros(N)
+e_an = np.full(N,np.exp(1)) # Creates an array of length N with the same value np.exp(1)
+
+for i in range(0,N):
+    e_num[i] = exptaylor(1,i)
+    error[i] = np.abs((e_num[i]-e_an[i]))/e_an[i]
+
+plt.loglog(n, error,'o')
+plt.xlabel('number of timesteps N')
+plt.ylabel('relative error')
+plt.title('Truncation and roundoff error \naccumulation in log-log plot')
+    
 ```
 
 ```{code-cell} ipython3
